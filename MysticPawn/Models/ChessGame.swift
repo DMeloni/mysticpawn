@@ -75,6 +75,14 @@ struct ChessPosition: Equatable {
     }
 }
 
+// Définir les modes de jeu disponibles
+enum GameMode: String, CaseIterable, Identifiable {
+    case visual = "Visuel"
+    case coordinates = "Coordonnées"
+    
+    var id: String { rawValue }
+}
+
 class ChessGame: ObservableObject {
     @Published var targetPosition: ChessPosition
     @Published var score: Int = 0
@@ -90,6 +98,9 @@ class ChessGame: ObservableObject {
     @Published var selectedTheme: ChessboardTheme = .blackWhite // Thème d'échiquier sélectionné
     @Published var hasGameEnded: Bool = false  // Indique si la partie est terminée (temps écoulé ou abandon)
     @Published var isSoundEnabled: Bool = true  // Activer ou désactiver les effets sonores
+    @Published var selectedGameMode: GameMode = .visual
+    @Published var userInput: String = ""
+    @Published var isInputActive: Bool = false
     
     private var timer: AnyCancellable?
     private var countdownTimer: AnyCancellable?
@@ -168,6 +179,13 @@ class ChessGame: ObservableObject {
             // Définir la valeur par défaut si elle n'existe pas encore
             UserDefaults.standard.set(true, forKey: "isSoundEnabled")
         }
+        
+        if let gameMode = UserDefaults.standard.string(forKey: "selectedGameMode"),
+           let mode = GameMode(rawValue: gameMode) {
+            selectedGameMode = mode
+        } else {
+            UserDefaults.standard.set(GameMode.visual.rawValue, forKey: "selectedGameMode")
+        }
     }
     
     // Charger les effets sonores
@@ -215,6 +233,7 @@ class ChessGame: ObservableObject {
         UserDefaults.standard.set(useFemaleVoice, forKey: "useFemaleVoice")
         UserDefaults.standard.set(selectedTheme.rawValue, forKey: "selectedTheme")
         UserDefaults.standard.set(isSoundEnabled, forKey: "isSoundEnabled")
+        UserDefaults.standard.set(selectedGameMode.rawValue, forKey: "selectedGameMode")
     }
     
     // Changer l'état de la synthèse vocale
@@ -238,6 +257,12 @@ class ChessGame: ObservableObject {
     // Changer l'état des effets sonores
     func toggleSound() {
         isSoundEnabled.toggle()
+        saveUserPreferences()
+    }
+    
+    // Changer le mode de jeu
+    func setGameMode(_ mode: GameMode) {
+        selectedGameMode = mode
         saveUserPreferences()
     }
     
@@ -368,13 +393,20 @@ class ChessGame: ObservableObject {
             }
     }
     
-    // Fonction pour lire vocalement la position cible
+    // Fonction pour vocaliser la position cible
     private func speakTargetPosition() {
-        // Ne pas parler si la fonctionnalité est désactivée
         guard isSpeechEnabled else { return }
         
+        // Ne pas prononcer les coordonnées en mode saisie
+        if selectedGameMode == .coordinates {
+            return
+        }
+        
         let utterance = AVSpeechUtterance(string: targetPosition.notation)
-        configureVoice(utterance, isGameplay: true)
+        utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+        utterance.rate = 0.5
+        utterance.pitchMultiplier = useFemaleVoice ? 1.2 : 1.0
+        utterance.volume = 1.0
         
         speechSynthesizer.speak(utterance)
     }
@@ -399,32 +431,55 @@ class ChessGame: ObservableObject {
     func checkAnswer(_ position: ChessPosition) {
         guard isGameActive else { return }
         
-        if position == targetPosition {
-            score += 1
-            message = "Correct!"
-            isCorrect = true
-            
-            // Jouer le son de réussite
-            playSuccessSound()
-            
-            // Délai avant de générer une nouvelle position
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.message = ""
-                self.targetPosition = ChessGame.generateRandomPosition()
-                self.speakTargetPosition() // Lire la nouvelle position
+        if selectedGameMode == .visual {
+            if position == targetPosition {
+                score += 1
+                timeRemaining += 1 // Ajouter une seconde
+                message = "Correct!"
+                isCorrect = true
+                playSuccessSound()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.message = ""
+                    self.targetPosition = ChessGame.generateRandomPosition()
+                    self.speakTargetPosition()
+                }
+            } else {
+                score -= 1
+                message = "Try again!"
+                isCorrect = false
+                playFailureSound()
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self.message = ""
+                }
             }
         } else {
-            // Réduire le score de 1, permettre les scores négatifs
-            score -= 1
-            message = "Try again!"
-            isCorrect = false
-            
-            // Jouer le son d'échec
-            playFailureSound()
-            
-            // Effacer le message d'erreur après un délai
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                self.message = ""
+            // Mode coordonnées
+            if let inputPosition = ChessPosition.from(notation: userInput.uppercased()) {
+                if inputPosition == targetPosition {
+                    score += 1
+                    timeRemaining += 1 // Ajouter une seconde
+                    message = "Correct!"
+                    isCorrect = true
+                    playSuccessSound()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        self.message = ""
+                        self.targetPosition = ChessGame.generateRandomPosition()
+                        self.speakTargetPosition()
+                        self.userInput = "" // Réinitialiser le champ de saisie
+                    }
+                } else {
+                    score -= 1
+                    message = "Try again!"
+                    isCorrect = false
+                    playFailureSound()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        self.message = ""
+                    }
+                }
             }
         }
     }

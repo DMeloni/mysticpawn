@@ -4,6 +4,7 @@ struct GameView: View {
     @ObservedObject var game: ChessGame
     @Binding var currentView: AppView
     @State private var showQuitConfirmation: Bool = false
+    @FocusState private var isInputFocused: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -41,9 +42,9 @@ struct GameView: View {
                         Text(game.targetPosition.notation)
                             .font(.system(size: 36, weight: .bold))
                             .foregroundColor(AppColors.textDark)
-                            .opacity(game.isGameActive && !game.isCountingDown ? 1 : 0)
+                            .opacity(game.isGameActive && !game.isCountingDown && game.selectedGameMode == .visual ? 1 : 0)
                             .animation(.easeInOut(duration: 0.5), value: game.isCountingDown)
-                            .scaleEffect(game.isGameActive && !game.isCountingDown ? 1 : 0.5)
+                            .scaleEffect(game.isGameActive && !game.isCountingDown && game.selectedGameMode == .visual ? 1 : 0.5)
                         
                         Spacer()
                         
@@ -67,7 +68,19 @@ struct GameView: View {
                         ZStack {
                             ChessboardView(game: game)
                                 .frame(width: geometry.size.width, height: geometry.size.width)
-                                .opacity(game.isGameActive || game.isCountingDown ? 1 : 0.7)
+                                .disabled(game.selectedGameMode == .coordinates)
+                            
+                            // Surbrillance de la case cible en mode saisie
+                            if game.selectedGameMode == .coordinates {
+                                let squareSize = geometry.size.width / 8
+                                Rectangle()
+                                    .fill(Color.yellow.opacity(0.3))
+                                    .frame(width: squareSize, height: squareSize)
+                                    .position(
+                                        x: CGFloat(game.targetPosition.file) * squareSize + squareSize/2,
+                                        y: CGFloat(7 - game.targetPosition.rank) * squareSize + squareSize/2
+                                    )
+                            }
                             
                             // Affichage du compte à rebours
                             if game.isCountingDown {
@@ -88,8 +101,81 @@ struct GameView: View {
                             }
                         }
                     }
-                    .frame(height: UIScreen.main.bounds.width) // Définir une hauteur fixe
+                    .frame(height: UIScreen.main.bounds.width)
                     .padding(.horizontal, 0)
+                    
+                    // Interface de saisie des coordonnées
+                    if game.selectedGameMode == .coordinates {
+                        VStack(spacing: 15) {
+                            Text("Entrez les coordonnées")
+                                .font(.headline)
+                                .foregroundColor(AppColors.textDark)
+                            
+                            // Boutons des lettres (A-H)
+                            HStack(spacing: 8) {
+                                ForEach(["A", "B", "C", "D", "E", "F", "G", "H"], id: \.self) { letter in
+                                    Button(action: {
+                                        if game.userInput.isEmpty || game.userInput.count == 2 {
+                                            game.userInput = letter
+                                        } else {
+                                            // Si une lettre est déjà sélectionnée, on la remplace
+                                            game.userInput = letter
+                                        }
+                                    }) {
+                                        Text(letter)
+                                            .font(.system(size: 20, weight: .medium))
+                                            .frame(width: 35, height: 35)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(game.userInput.prefix(1) == letter ? 
+                                                          AppColors.woodMedium : 
+                                                          Color(hex: "E8DECD"))
+                                            )
+                                            .foregroundColor(game.userInput.prefix(1) == letter ? 
+                                                           AppColors.textLight : 
+                                                           AppColors.accent)
+                                    }
+                                    .disabled(!game.isGameActive)
+                                }
+                            }
+                            
+                            // Boutons des chiffres (1-8)
+                            HStack(spacing: 8) {
+                                ForEach(["1", "2", "3", "4", "5", "6", "7", "8"], id: \.self) { number in
+                                    Button(action: {
+                                        if game.userInput.count == 1 {
+                                            // Si une lettre est déjà sélectionnée, on ajoute le chiffre
+                                            game.userInput += number
+                                            game.checkAnswer(game.targetPosition)
+                                            // Réinitialiser après un court délai
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                                game.userInput = ""
+                                            }
+                                        } else if game.userInput.count == 2 {
+                                            // Si un chiffre est déjà sélectionné, on le remplace
+                                            game.userInput = String(game.userInput.prefix(1)) + number
+                                        }
+                                    }) {
+                                        Text(number)
+                                            .font(.system(size: 20, weight: .medium))
+                                            .frame(width: 35, height: 35)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(game.userInput.count == 2 && game.userInput.suffix(1) == number ? 
+                                                          AppColors.woodMedium : 
+                                                          Color(hex: "E8DECD"))
+                                            )
+                                            .foregroundColor(game.userInput.count == 2 && game.userInput.suffix(1) == number ? 
+                                                           AppColors.textLight : 
+                                                           AppColors.accent)
+                                    }
+                                    .disabled(!game.isGameActive)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                    }
                     
                     // Barre de score et bouton
                     HStack {
@@ -126,31 +212,16 @@ struct GameView: View {
             }
         }
         .edgesIgnoringSafeArea(.top)
-        .alert(isPresented: $showQuitConfirmation) {
-            Alert(
-                title: Text("Abandonner la partie ?"),
-                message: Text("Votre partie en cours sera perdue. Voulez-vous vraiment quitter ?"),
-                primaryButton: .destructive(Text("Abandonner")) {
-                    // Arrêter la partie mais ne pas afficher le menu immédiatement
-                    game.endGame()
-                    
-                    // Petite attente pour montrer l'écran de Game Over
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation {
-                            // Le GameOverView sera automatiquement affiché par le ContentView
-                            // car game.isGameActive est maintenant false et timeRemaining est 0
-                            
-                            // Après un court délai, retourner à l'accueil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                withAnimation {
-                                    currentView = .home
-                                }
-                            }
-                        }
-                    }
-                },
-                secondaryButton: .cancel(Text("Continuer"))
-            )
+        .alert("Abandonner la partie ?", isPresented: $showQuitConfirmation) {
+            Button("Annuler", role: .cancel) { }
+            Button("Abandonner", role: .destructive) {
+                game.endGame()
+                withAnimation {
+                    currentView = .home
+                }
+            }
+        } message: {
+            Text("Votre progression sera perdue.")
         }
     }
-} 
+}

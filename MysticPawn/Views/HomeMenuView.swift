@@ -20,11 +20,11 @@ struct HomeMenuView: View {
                     Image("logo_menu")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 280)
+                        .frame(width: 320)
                         .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 3)
-                
                 }
-                .padding(.top, 60)
+                .padding(.top, 40)
+                .padding(.bottom, 20)
                 
                 // Petit échiquier décoratif
                 ZStack {
@@ -62,42 +62,79 @@ struct HomeMenuView: View {
                 
                 // Boutons du menu principal
                 VStack(spacing: 20) {
-                    MenuButtonView(title: "Jouer", icon: "play.fill") {
+                    // Bouton pour démarrer une partie
+                    Button(action: {
                         withAnimation {
                             currentView = .timerSelection
                         }
-                    }
-                    
-                    MenuButtonView(title: "Paramètres", icon: "gear") {
-                        withAnimation {
-                            currentView = .settings
+                    }) {
+                        HStack {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 20))
+                            Text("Jouer")
+                                .font(.headline)
                         }
+                        .frame(width: 200)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 15)
+                        .background(Color(hex: "D3A536"))
+                        .foregroundColor(AppColors.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 2)
                     }
                     
-                    MenuButtonView(title: "Classement", icon: "trophy.fill") {
+                    // Bouton pour le classement
+                    Button(action: {
                         withAnimation {
                             // Action pour le classement (à implémenter)
                         }
+                    }) {
+                        HStack {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 20))
+                            Text("Classement")
+                                .font(.headline)
+                        }
+                        .frame(width: 200)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 15)
+                        .background(Color(hex: "E8DECD"))
+                        .foregroundColor(AppColors.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 2)
                     }
                     
-                    MenuButtonView(title: "Quitter", icon: "power") {
-                        // Quitter l'application
-                        #if os(iOS)
-                        exit(0)
-                        #endif
+                    // Bouton pour les paramètres
+                    Button(action: {
+                        withAnimation {
+                            currentView = .settings
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "gear")
+                                .font(.system(size: 20))
+                            Text("Paramètres")
+                                .font(.headline)
+                        }
+                        .frame(width: 200)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 15)
+                        .background(Color(hex: "E8DECD"))
+                        .foregroundColor(AppColors.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(radius: 2)
                     }
                 }
-                
-                Spacer()
-                
-                // Version de l'application
-                Text("v1.0")
-                    .font(.caption)
-                    .foregroundColor(AppColors.accent.opacity(0.5))
-                    .padding(.bottom, 10)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, 30)
         }
+        .background(
+            AppColors.background
+                .overlay(
+                    WoodGrainOverlay()
+                        .opacity(0.1)
+                )
+        )
     }
 }
 

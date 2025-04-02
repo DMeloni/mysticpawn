@@ -102,7 +102,7 @@ struct WoodGrainOverlay: View {
 struct AppColors {
     static let background = Color(hex: "F5F0E5") // Fond clair
     static let woodDark = Color(hex: "8B4513") // Bois foncé
-    static let woodMedium = Color(hex: "A0522D") // Bois moyen
+    static let woodMedium = Color(hex: "D3A536") // Bois moyen
     static let woodLight = Color(hex: "CD853F") // Bois clair
     static let accent = Color(hex: "5D4037") // Accent pour le texte
     static let textDark = Color(hex: "292929") // Texte foncé
