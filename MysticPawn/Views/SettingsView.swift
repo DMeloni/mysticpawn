@@ -33,8 +33,50 @@ struct SettingsView: View {
                         .foregroundColor(AppColors.accent)
                         .padding(.top, 30)
                     
-                    // Section synthèse vocale
+                    // Section Audio
                     VStack(spacing: 20) {
+                        // Titre de la section
+                        Text("Audio")
+                            .font(.headline)
+                            .foregroundColor(AppColors.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 5)
+                        
+                        // Option pour activer/désactiver les effets sonores
+                        Toggle(isOn: Binding(
+                            get: { game.isSoundEnabled },
+                            set: { newValue in
+                                game.isSoundEnabled = newValue
+                                // Sauvegarder le paramètre
+                                UserDefaults.standard.set(newValue, forKey: "isSoundEnabled")
+                            }
+                        )) {
+                            HStack {
+                                Image(systemName: "speaker.wave.3.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(AppColors.accent)
+                                    .frame(width: 30)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Effets sonores")
+                                        .font(.headline)
+                                        .foregroundColor(AppColors.accent)
+                                    
+                                    Text("Sons de réussite et d'échec")
+                                        .font(.subheadline)
+                                        .foregroundColor(AppColors.accent.opacity(0.7))
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.7))
+                        )
+                        .toggleStyle(SwitchToggleStyle(tint: AppColors.woodMedium))
+                        
                         // Option pour activer/désactiver la synthèse vocale
                         Toggle(isOn: Binding(
                             get: { game.isSpeechEnabled },

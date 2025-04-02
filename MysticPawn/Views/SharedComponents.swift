@@ -10,14 +10,15 @@ struct NavigationBar: View {
     
     var body: some View {
         ZStack {
-            AppColors.woodLight.opacity(0.8)
-                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 2)
+            // Utiliser une couleur uniforme pour toutes les barres de navigation
+            AppColors.woodMedium
+                .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 2)
             
             HStack {
                 Button(action: leftAction) {
                     Image(systemName: leftIcon)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(AppColors.accent)
+                        .foregroundColor(AppColors.textLight)
                         .padding(.leading, 16)
                 }
                 
@@ -26,21 +27,21 @@ struct NavigationBar: View {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(AppColors.accent)
+                    .foregroundColor(AppColors.textLight)
                 
                 Spacer()
                 
                 Button(action: rightAction) {
                     Image(systemName: rightIcon)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(AppColors.accent)
+                        .foregroundColor(AppColors.textLight)
                         .padding(.trailing, 16)
                 }
             }
         }
         .frame(height: 50)
         .padding(.top, UIApplication.shared.windows.first?.safeAreaInsets.top ?? 0)
-        .background(AppColors.woodLight.opacity(0.8))
+        .background(AppColors.woodMedium) // Même couleur que le ZStack
         .ignoresSafeArea(edges: .top)
     }
 }

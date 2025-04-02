@@ -89,10 +89,13 @@ class ChessGame: ObservableObject {
     @Published var useFemaleVoice: Bool = true   // Choisir entre voix masculine et féminine
     @Published var selectedTheme: ChessboardTheme = .blackWhite // Thème d'échiquier sélectionné
     @Published var hasGameEnded: Bool = false  // Indique si la partie est terminée (temps écoulé ou abandon)
+    @Published var isSoundEnabled: Bool = true  // Activer ou désactiver les effets sonores
     
     private var timer: AnyCancellable?
     private var countdownTimer: AnyCancellable?
     private let speechSynthesizer = AVSpeechSynthesizer()
+    private var successSound: AVAudioPlayer?
+    private var failureSound: AVAudioPlayer?
     
     init() {
         self.targetPosition = ChessGame.generateRandomPosition()
@@ -130,6 +133,9 @@ class ChessGame: ObservableObject {
             // Initialiser le système de synthèse vocale
             self.speechSynthesizer.speak(preloadUtterance)
         }
+        
+        // Charger les effets sonores
+        loadSoundEffects()
     }
     
     // Charger les préférences de l'utilisateur
@@ -155,6 +161,52 @@ class ChessGame: ObservableObject {
             // Définir la valeur par défaut si elle n'existe pas encore
             UserDefaults.standard.set(ChessboardTheme.blackWhite.rawValue, forKey: "selectedTheme")
         }
+        
+        if let soundEnabled = UserDefaults.standard.object(forKey: "isSoundEnabled") as? Bool {
+            isSoundEnabled = soundEnabled
+        } else {
+            // Définir la valeur par défaut si elle n'existe pas encore
+            UserDefaults.standard.set(true, forKey: "isSoundEnabled")
+        }
+    }
+    
+    // Charger les effets sonores
+    private func loadSoundEffects() {
+        // Charger le son de réussite
+        if let successSoundURL = Bundle.main.url(forResource: "success", withExtension: "wav") {
+            do {
+                successSound = try AVAudioPlayer(contentsOf: successSoundURL)
+                successSound?.prepareToPlay()
+            } catch {
+                print("Impossible de charger le son de réussite: \(error)")
+            }
+        }
+        
+        // Charger le son d'échec
+        if let failureSoundURL = Bundle.main.url(forResource: "failure", withExtension: "wav") {
+            do {
+                failureSound = try AVAudioPlayer(contentsOf: failureSoundURL)
+                failureSound?.prepareToPlay()
+            } catch {
+                print("Impossible de charger le son d'échec: \(error)")
+            }
+        }
+    }
+    
+    // Jouer le son de réussite
+    private func playSuccessSound() {
+        guard isSoundEnabled else { return }
+        
+        successSound?.currentTime = 0
+        successSound?.play()
+    }
+    
+    // Jouer le son d'échec
+    private func playFailureSound() {
+        guard isSoundEnabled else { return }
+        
+        failureSound?.currentTime = 0
+        failureSound?.play()
     }
     
     // Sauvegarder les préférences de l'utilisateur
@@ -162,6 +214,7 @@ class ChessGame: ObservableObject {
         UserDefaults.standard.set(isSpeechEnabled, forKey: "isSpeechEnabled")
         UserDefaults.standard.set(useFemaleVoice, forKey: "useFemaleVoice")
         UserDefaults.standard.set(selectedTheme.rawValue, forKey: "selectedTheme")
+        UserDefaults.standard.set(isSoundEnabled, forKey: "isSoundEnabled")
     }
     
     // Changer l'état de la synthèse vocale
@@ -179,6 +232,12 @@ class ChessGame: ObservableObject {
     // Changer le thème de l'échiquier
     func setTheme(_ theme: ChessboardTheme) {
         selectedTheme = theme
+        saveUserPreferences()
+    }
+    
+    // Changer l'état des effets sonores
+    func toggleSound() {
+        isSoundEnabled.toggle()
         saveUserPreferences()
     }
     
@@ -345,6 +404,9 @@ class ChessGame: ObservableObject {
             message = "Correct!"
             isCorrect = true
             
+            // Jouer le son de réussite
+            playSuccessSound()
+            
             // Délai avant de générer une nouvelle position
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 self.message = ""
@@ -356,6 +418,9 @@ class ChessGame: ObservableObject {
             score -= 1
             message = "Try again!"
             isCorrect = false
+            
+            // Jouer le son d'échec
+            playFailureSound()
             
             // Effacer le message d'erreur après un délai
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
