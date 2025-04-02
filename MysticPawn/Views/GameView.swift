@@ -3,7 +3,7 @@ import SwiftUI
 struct GameView: View {
     @ObservedObject var game: ChessGame
     @Binding var currentView: AppView
-    @Binding var showMenu: Bool
+    @State private var showQuitConfirmation: Bool = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -11,10 +11,17 @@ struct GameView: View {
             NavigationBar(
                 title: "MysticPawn",
                 leftAction: {
-                    withAnimation {
-                        showMenu.toggle()
+                    // Si une partie est en cours, demander confirmation
+                    if game.isGameActive || game.isCountingDown {
+                        showQuitConfirmation = true
+                    } else {
+                        // Sinon, retourner à l'accueil
+                        withAnimation {
+                            currentView = .home
+                        }
                     }
                 },
+                leftIcon: "house.fill",
                 rightIcon: "questionmark.circle", 
                 rightAction: {}
             )
@@ -119,40 +126,31 @@ struct GameView: View {
             }
         }
         .edgesIgnoringSafeArea(.top)
-    }
-}
-
-// Overlay pour fin de partie
-struct GameOverView: View {
-    @ObservedObject var game: ChessGame
-    @Binding var currentView: AppView
-    
-    var body: some View {
-        VStack {
-            Text("Game Over!")
-                .font(.system(size: 40, weight: .bold))
-                .foregroundColor(AppColors.textLight)
-            Text("Final Score: \(game.score)")
-                .font(.title)
-                .foregroundColor(AppColors.textLight)
-                .padding(.top, 10)
-            
-            Button(action: {
-                currentView = .timerSelection
-            }) {
-                Text("Play Again")
-                    .font(.headline)
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 15)
-                    .background(AppColors.woodMedium)
-                    .foregroundColor(AppColors.textLight)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .shadow(radius: 2)
-            }
-            .padding(.top, 30)
+        .alert(isPresented: $showQuitConfirmation) {
+            Alert(
+                title: Text("Abandonner la partie ?"),
+                message: Text("Votre partie en cours sera perdue. Voulez-vous vraiment quitter ?"),
+                primaryButton: .destructive(Text("Abandonner")) {
+                    // Arrêter la partie mais ne pas afficher le menu immédiatement
+                    game.endGame()
+                    
+                    // Petite attente pour montrer l'écran de Game Over
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation {
+                            // Le GameOverView sera automatiquement affiché par le ContentView
+                            // car game.isGameActive est maintenant false et timeRemaining est 0
+                            
+                            // Après un court délai, retourner à l'accueil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                withAnimation {
+                                    currentView = .home
+                                }
+                            }
+                        }
+                    }
+                },
+                secondaryButton: .cancel(Text("Continuer"))
+            )
         }
-        .padding(40)
-        .background(Color.black.opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 } 

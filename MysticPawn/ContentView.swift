@@ -3,8 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var game = ChessGame()
     @State private var animationAmount: CGFloat = 0
-    @State private var showMenu: Bool = false
-    @State private var currentView: AppView = .timerSelection
+    @State private var currentView: AppView = .home // Commencer par l'écran d'accueil
     
     var body: some View {
         ZStack {
@@ -17,75 +16,14 @@ struct ContentView: View {
                 .ignoresSafeArea()
             
             // Contenu principal selon la vue active
-            if currentView == .game {
-                GameView(game: game, currentView: $currentView, showMenu: $showMenu)
+            if currentView == .home {
+                HomeMenuView(game: game, currentView: $currentView)
+            } else if currentView == .game {
+                GameView(game: game, currentView: $currentView)
             } else if currentView == .timerSelection {
-                TimerSelectionView(game: game, currentView: $currentView, showMenu: $showMenu)
+                TimerSelectionView(game: game, currentView: $currentView)
             } else if currentView == .settings {
-                SettingsView(game: game, currentView: $currentView, showMenu: $showMenu)
-            }
-            
-            // Menu latéral
-            if showMenu {
-                Color.black.opacity(0.4)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation {
-                            showMenu.toggle()
-                        }
-                    }
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("Menu")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(AppColors.accent)
-                            .padding(.top, 50)
-                            .padding(.bottom, 20)
-                        
-                        MenuItemView(iconName: "house.fill", title: "Accueil") {
-                            withAnimation {
-                                showMenu.toggle()
-                                currentView = .timerSelection
-                            }
-                        }
-                        
-                        MenuItemView(iconName: "gear", title: "Paramètres") {
-                            withAnimation {
-                                showMenu.toggle()
-                                currentView = .settings
-                            }
-                        }
-                        
-                        MenuItemView(iconName: "trophy.fill", title: "Classement") {
-                            withAnimation {
-                                showMenu.toggle()
-                            }
-                        }
-                        
-                        MenuItemView(iconName: "info.circle.fill", title: "À propos") {
-                            withAnimation {
-                                showMenu.toggle()
-                            }
-                        }
-                        
-                        Spacer()
-                    }
-                    .frame(width: 250)
-                    .padding(.horizontal, 20)
-                    .background(
-                        AppColors.background
-                            .overlay(
-                                WoodGrainOverlay()
-                                    .opacity(0.2)
-                            )
-                    )
-                    .ignoresSafeArea(edges: .vertical)
-                    
-                    Spacer()
-                }
-                .transition(.move(edge: .leading))
+                SettingsView(game: game, currentView: $currentView)
             }
             
             // Effet visuel de brillance en cas de succès/échec
@@ -108,7 +46,8 @@ struct ContentView: View {
             }
             
             // Overlay pour fin de partie
-            if !game.isGameActive && game.timeRemaining == 0 && currentView == .game {
+            if game.hasGameEnded && currentView == .game {
+                // Afficher Game Over si partie terminée (temps écoulé ou abandon)
                 GameOverView(game: game, currentView: $currentView)
             }
         }

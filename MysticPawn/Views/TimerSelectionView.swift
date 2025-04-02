@@ -3,7 +3,6 @@ import SwiftUI
 struct TimerSelectionView: View {
     @ObservedObject var game: ChessGame
     @Binding var currentView: AppView
-    @Binding var showMenu: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -12,13 +11,14 @@ struct TimerSelectionView: View {
                 title: "Sélection du temps",
                 leftAction: {
                     withAnimation {
-                        showMenu.toggle()
+                        currentView = .home
                     }
                 },
+                leftIcon: "house.fill",
                 rightIcon: "xmark",
                 rightAction: {
                     withAnimation {
-                        currentView = .game
+                        currentView = .home
                     }
                 }
             )

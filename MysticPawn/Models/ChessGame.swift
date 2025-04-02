@@ -88,6 +88,7 @@ class ChessGame: ObservableObject {
     @Published var isSpeechEnabled: Bool = true  // Activer ou désactiver la synthèse vocale
     @Published var useFemaleVoice: Bool = true   // Choisir entre voix masculine et féminine
     @Published var selectedTheme: ChessboardTheme = .blackWhite // Thème d'échiquier sélectionné
+    @Published var hasGameEnded: Bool = false  // Indique si la partie est terminée (temps écoulé ou abandon)
     
     private var timer: AnyCancellable?
     private var countdownTimer: AnyCancellable?
@@ -98,6 +99,37 @@ class ChessGame: ObservableObject {
         
         // Charger les préférences utilisateur
         loadUserPreferences()
+        
+        // Précharger la synthèse vocale en arrière-plan
+        DispatchQueue.global(qos: .background).async {
+            // Créer une petite utterance silencieuse pour initialiser le système
+            let preloadUtterance = AVSpeechUtterance(string: " ")
+            if self.useFemaleVoice {
+                let femaleVoices = [
+                    "com.apple.ttsbundle.Amelie-compact",
+                    "com.apple.voice.compact.fr-FR.Aurelie"
+                ]
+                
+                for voiceID in femaleVoices {
+                    if let voice = AVSpeechSynthesisVoice(identifier: voiceID) {
+                        preloadUtterance.voice = voice
+                        break
+                    }
+                }
+                
+                if preloadUtterance.voice == nil {
+                    preloadUtterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+                }
+            } else {
+                preloadUtterance.voice = AVSpeechSynthesisVoice(identifier: "com.apple.ttsbundle.Thomas-compact")
+                if preloadUtterance.voice == nil {
+                    preloadUtterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+                }
+            }
+            
+            // Initialiser le système de synthèse vocale
+            self.speechSynthesizer.speak(preloadUtterance)
+        }
     }
     
     // Charger les préférences de l'utilisateur
@@ -164,6 +196,7 @@ class ChessGame: ObservableObject {
         // Réinitialiser le jeu
         score = 0
         timeRemaining = duration
+        hasGameEnded = false  // Réinitialiser l'état de fin de partie
         
         // Démarrer le compte à rebours
         startCountdown()
@@ -296,6 +329,12 @@ class ChessGame: ObservableObject {
         isGameActive = false
         timer?.cancel()
         timer = nil
+        
+        // Marquer la partie comme terminée
+        hasGameEnded = true
+        
+        // Ne pas réinitialiser le score pour permettre l'affichage du Game Over
+        // Le score sera réinitialisé lors du prochain démarrage de jeu
     }
     
     func checkAnswer(_ position: ChessPosition) {

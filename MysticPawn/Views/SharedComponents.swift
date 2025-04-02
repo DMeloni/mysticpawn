@@ -4,6 +4,7 @@ import SwiftUI
 struct NavigationBar: View {
     let title: String
     let leftAction: () -> Void
+    let leftIcon: String
     let rightIcon: String
     let rightAction: () -> Void
     
@@ -14,7 +15,7 @@ struct NavigationBar: View {
             
             HStack {
                 Button(action: leftAction) {
-                    Image(systemName: "line.horizontal.3")
+                    Image(systemName: leftIcon)
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(AppColors.accent)
                         .padding(.leading, 16)
@@ -139,6 +140,7 @@ extension Color {
 
 // Définition des types d'écrans dans l'application
 enum AppView {
+    case home
     case game
     case timerSelection
     case settings
