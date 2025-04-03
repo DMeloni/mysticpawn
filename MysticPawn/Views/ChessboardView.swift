@@ -26,19 +26,38 @@ struct ChessboardView: View {
                     .stroke(Color(hex: game.selectedTheme.borderColor), lineWidth: 3)
             )
             
-            // Échiquier avec Grid explicite
-            VStack(spacing: 0) {
-                ForEach((0...7).reversed(), id: \.self) { rank in
-                    HStack(spacing: 0) {
-                        ForEach(0...7, id: \.self) { file in
-                            let position = ChessPosition(file: file, rank: rank)
-                            SquareView(position: position, game: game)
-                                .aspectRatio(1, contentMode: .fill)
+            // Échiquier avec Grid explicite - on inverse tout quand la reine noire est en bas
+            if !game.isWhiteQueenOnTop {
+                // Plateau inversé (rotation 180°)
+                VStack(spacing: 0) {
+                    ForEach(0...7, id: \.self) { rank in
+                        HStack(spacing: 0) {
+                            ForEach((0...7).reversed(), id: \.self) { file in
+                                // Les positions restent les mêmes, c'est l'affichage qui est inversé
+                                let position = ChessPosition(file: file, rank: rank)
+                                SquareView(position: position, game: game, isInverted: true)
+                                    .aspectRatio(1, contentMode: .fill)
+                            }
                         }
                     }
                 }
+                .padding(2)
+                .rotationEffect(.degrees(180)) // Rotation pour inverser complètement le plateau
+            } else {
+                // Plateau normal
+                VStack(spacing: 0) {
+                    ForEach((0...7).reversed(), id: \.self) { rank in
+                        HStack(spacing: 0) {
+                            ForEach(0...7, id: \.self) { file in
+                                let position = ChessPosition(file: file, rank: rank)
+                                SquareView(position: position, game: game, isInverted: false)
+                                    .aspectRatio(1, contentMode: .fill)
+                            }
+                        }
+                    }
+                }
+                .padding(2)
             }
-            .padding(2)
         }
         .clipShape(RoundedRectangle(cornerRadius: 2))
     }
@@ -47,6 +66,7 @@ struct ChessboardView: View {
 struct SquareView: View {
     let position: ChessPosition
     @ObservedObject var game: ChessGame
+    let isInverted: Bool // Indique si le plateau est inversé
     @State private var isPressed = false
     
     var body: some View {
@@ -101,6 +121,30 @@ struct SquareView: View {
                         )
                     )
                     .opacity(isPressed ? 0.5 : 1.0)
+                
+                // Dame blanche en D1 ou en E8
+                if ((position.file == 3 && position.rank == 0 && !game.isWhiteQueenOnTop) || 
+                   (position.file == 4 && position.rank == 7 && game.isWhiteQueenOnTop)) && 
+                   !game.isCountingDown {
+                    Image("white_queen")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 45, height: 45)
+                        .zIndex(10)
+                        .rotationEffect(isInverted ? .degrees(180) : .degrees(0))
+                }
+                
+                // Dame noire en D8 ou en E1
+                if ((position.file == 3 && position.rank == 7 && !game.isWhiteQueenOnTop) || 
+                   (position.file == 4 && position.rank == 0 && game.isWhiteQueenOnTop)) && 
+                   !game.isCountingDown {
+                    Image("black_queen")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 45, height: 45)
+                        .zIndex(10)
+                        .rotationEffect(isInverted ? .degrees(180) : .degrees(0))
+                }
             }
             .shadow(color: Color.black.opacity(isPressed ? 0.1 : 0.2), 
                     radius: isPressed ? 1 : 3, 
@@ -120,6 +164,7 @@ struct SquareView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!game.isGameActive || game.isCountingDown) // Désactiver pendant le compte à rebours
+        .compositingGroup() // Groupe pour empêcher la modification d'opacité sur les enfants
     }
 }
 

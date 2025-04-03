@@ -83,6 +83,15 @@ enum GameMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// Définir les options de position des dames
+enum QueenPosition: String, CaseIterable, Identifiable {
+    case whiteOnBottom = "Dame Blanche en bas"
+    case blackOnBottom = "Dame Noire en bas" 
+    case random = "Aléatoire"
+    
+    var id: String { rawValue }
+}
+
 class ChessGame: ObservableObject {
     @Published var targetPosition: ChessPosition
     @Published var score: Int = 0
@@ -101,6 +110,20 @@ class ChessGame: ObservableObject {
     @Published var selectedGameMode: GameMode = .visual
     @Published var userInput: String = ""
     @Published var isInputActive: Bool = false
+    @Published var isWhiteQueenOnTop: Bool = false  // Indique si la reine blanche est en haut (D8) ou en bas (D1)
+    @Published var selectedQueenPosition: QueenPosition = .random // Option de position des dames
+    
+    // Notation à afficher et à prononcer en fonction de l'orientation du plateau
+    var displayNotation: String {
+        if isWhiteQueenOnTop {
+            // Plateau inversé, afficher les coordonnées inversées
+            let invertedPosition = ChessPosition(file: 7 - targetPosition.file, rank: 7 - targetPosition.rank)
+            return invertedPosition.notation
+        } else {
+            // Plateau normal, afficher les coordonnées directes
+            return targetPosition.notation
+        }
+    }
     
     private var timer: AnyCancellable?
     private var countdownTimer: AnyCancellable?
@@ -114,32 +137,16 @@ class ChessGame: ObservableObject {
         // Charger les préférences utilisateur
         loadUserPreferences()
         
+        // Lister toutes les voix disponibles sur l'appareil pour diagnostic
+        logAvailableVoices()
+        
         // Précharger la synthèse vocale en arrière-plan
         DispatchQueue.global(qos: .background).async {
             // Créer une petite utterance silencieuse pour initialiser le système
             let preloadUtterance = AVSpeechUtterance(string: " ")
-            if self.useFemaleVoice {
-                let femaleVoices = [
-                    "com.apple.ttsbundle.Amelie-compact",
-                    "com.apple.voice.compact.fr-FR.Aurelie"
-                ]
-                
-                for voiceID in femaleVoices {
-                    if let voice = AVSpeechSynthesisVoice(identifier: voiceID) {
-                        preloadUtterance.voice = voice
-                        break
-                    }
-                }
-                
-                if preloadUtterance.voice == nil {
-                    preloadUtterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
-                }
-            } else {
-                preloadUtterance.voice = AVSpeechSynthesisVoice(identifier: "com.apple.ttsbundle.Thomas-compact")
-                if preloadUtterance.voice == nil {
-                    preloadUtterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
-                }
-            }
+            
+            // Utiliser la même configuration de voix que pour l'utilisation normale
+            self.configureVoice(preloadUtterance, isGameplay: false)
             
             // Initialiser le système de synthèse vocale
             self.speechSynthesizer.speak(preloadUtterance)
@@ -186,6 +193,14 @@ class ChessGame: ObservableObject {
         } else {
             UserDefaults.standard.set(GameMode.visual.rawValue, forKey: "selectedGameMode")
         }
+        
+        if let queenPosition = UserDefaults.standard.string(forKey: "selectedQueenPosition"),
+           let position = QueenPosition(rawValue: queenPosition) {
+            selectedQueenPosition = position
+        } else {
+            // Définir la valeur par défaut si elle n'existe pas encore
+            UserDefaults.standard.set(QueenPosition.random.rawValue, forKey: "selectedQueenPosition")
+        }
     }
     
     // Charger les effets sonores
@@ -227,13 +242,14 @@ class ChessGame: ObservableObject {
         failureSound?.play()
     }
     
-    // Sauvegarder les préférences de l'utilisateur
+    // Méthode pour sauvegarder les préférences utilisateur
     private func saveUserPreferences() {
         UserDefaults.standard.set(isSpeechEnabled, forKey: "isSpeechEnabled")
         UserDefaults.standard.set(useFemaleVoice, forKey: "useFemaleVoice")
         UserDefaults.standard.set(selectedTheme.rawValue, forKey: "selectedTheme")
         UserDefaults.standard.set(isSoundEnabled, forKey: "isSoundEnabled")
         UserDefaults.standard.set(selectedGameMode.rawValue, forKey: "selectedGameMode")
+        UserDefaults.standard.set(selectedQueenPosition.rawValue, forKey: "selectedQueenPosition")
     }
     
     // Changer l'état de la synthèse vocale
@@ -242,7 +258,7 @@ class ChessGame: ObservableObject {
         saveUserPreferences()
     }
     
-    // Changer le type de voix
+    // Changer le genre de la voix
     func toggleVoiceGender() {
         useFemaleVoice.toggle()
         saveUserPreferences()
@@ -264,6 +280,17 @@ class ChessGame: ObservableObject {
     func setGameMode(_ mode: GameMode) {
         selectedGameMode = mode
         saveUserPreferences()
+    }
+    
+    // Changer l'option de position des dames
+    func setQueenPosition(_ position: QueenPosition) {
+        selectedQueenPosition = position
+        saveUserPreferences()
+        
+        // Si on n'est pas en mode "Aléatoire", on définit tout de suite la position des dames
+        if position != .random {
+            isWhiteQueenOnTop = (position == .blackOnBottom)
+        }
     }
     
     static func generateRandomPosition() -> ChessPosition {
@@ -326,45 +353,91 @@ class ChessGame: ObservableObject {
     
     // Configure les paramètres de voix en fonction du contexte
     private func configureVoice(_ utterance: AVSpeechUtterance, isGameplay: Bool) {
-        // Sélectionner la voix en fonction du paramètre
+        // Récupérer toutes les voix disponibles
+        let allVoices = AVSpeechSynthesisVoice.speechVoices()
+        
+        // Filtrer les voix françaises
+        let frenchVoices = allVoices.filter { $0.language.starts(with: "fr") }
+        
         if useFemaleVoice {
-            // Différentes options de voix féminines françaises
-            let femaleVoices = [
-                "com.apple.ttsbundle.Amelie-compact",
-                "com.apple.voice.compact.fr-FR.Aurelie"
-            ]
+            // Rechercher d'abord les voix féminines par leur gender
+            let frenchFemaleVoices = frenchVoices.filter { $0.gender == .female }
             
-            // Essayer de définir une des voix féminines
-            var voiceFound = false
-            for voiceID in femaleVoices {
-                if let voice = AVSpeechSynthesisVoice(identifier: voiceID) {
-                    utterance.voice = voice
-                    voiceFound = true
-                    break
+            if !frenchFemaleVoices.isEmpty {
+                // Utiliser la première voix féminine disponible
+                utterance.voice = frenchFemaleVoices.first
+                print("✅ Voix féminine sélectionnée par gender: \(utterance.voice?.name ?? "inconnue")")
+            } else {
+                // Si aucune voix avec gender féminin n'est trouvée, essayer par identifiant
+                let femaleVoiceIDs = [
+                    "com.apple.voice.premium.fr-FR.Amelie",
+                    "com.apple.ttsbundle.Amelie-compact",
+                    "com.apple.voice.compact.fr-FR.Aurelie",
+                    "com.apple.eloquence.fr-FR.Aurelie",
+                    "com.apple.eloquence.fr-FR.Sandy"
+                ]
+                
+                var voiceFound = false
+                for voiceID in femaleVoiceIDs {
+                    if let voice = frenchVoices.first(where: { $0.identifier == voiceID }) {
+                        utterance.voice = voice
+                        voiceFound = true
+                        print("✅ Voix féminine sélectionnée par identifiant: \(voice.name)")
+                        break
+                    }
+                }
+                
+                // Si toujours pas de voix, utiliser la première voix française disponible
+                if !voiceFound {
+                    utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+                    print("⚠️ Fallback sur la voix française par défaut")
                 }
             }
-            
-            // Fallback si aucune voix spécifique n'est disponible
-            if !voiceFound {
-                utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
-            }
         } else {
-            // Voix masculine française
-            utterance.voice = AVSpeechSynthesisVoice(identifier: "com.apple.ttsbundle.Thomas-compact")
-            // Fallback si la voix spécifique n'est pas disponible
-            if utterance.voice == nil {
-                utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+            // Rechercher d'abord les voix masculines par leur gender
+            let frenchMaleVoices = frenchVoices.filter { $0.gender == .male }
+            
+            if !frenchMaleVoices.isEmpty {
+                // Utiliser la première voix masculine disponible
+                utterance.voice = frenchMaleVoices.first
+                print("✅ Voix masculine sélectionnée par gender: \(utterance.voice?.name ?? "inconnue")")
+            } else {
+                // Si aucune voix avec gender masculin n'est trouvée, essayer par identifiant
+                let maleVoiceIDs = [
+                    "com.apple.voice.premium.fr-FR.Thomas",
+                    "com.apple.ttsbundle.Thomas-compact",
+                    "com.apple.eloquence.fr-FR.Bruno",
+                    "com.apple.eloquence.fr-FR.Yannick"
+                ]
+                
+                var voiceFound = false
+                for voiceID in maleVoiceIDs {
+                    if let voice = frenchVoices.first(where: { $0.identifier == voiceID }) {
+                        utterance.voice = voice
+                        voiceFound = true
+                        print("✅ Voix masculine sélectionnée par identifiant: \(voice.name)")
+                        break
+                    }
+                }
+                
+                // Si toujours pas de voix, utiliser la première voix française disponible
+                if !voiceFound {
+                    utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+                    print("⚠️ Fallback sur la voix française par défaut")
+                }
             }
         }
         
+        // Ajuster les paramètres de la voix en fonction du contexte
         if isGameplay {
-            // Paramètres pour le jeu - plus rapide mais toujours naturel
-            utterance.rate = 0.55       // Vitesse légèrement plus rapide pour le gameplay
-            utterance.pitchMultiplier = 1.05 // Pitch presque normal pour garder le côté naturel
+            // Paramètres pour le jeu - plus naturel et moins robotique
+            utterance.rate = 0.50       // Vitesse adaptée pour le gameplay
+            utterance.pitchMultiplier = useFemaleVoice ? 1.2 : 0.95 // Ajuster le pitch selon le genre
+            utterance.postUtteranceDelay = 0.05 // Courte pause après l'énonciation
         } else {
             // Paramètres pour le compte à rebours - plus lent et clair
             utterance.rate = 0.45       // Vitesse plus lente pour le compte à rebours
-            utterance.pitchMultiplier = 1.1  // Légèrement plus aigu pour une meilleure clarté
+            utterance.pitchMultiplier = useFemaleVoice ? 1.25 : 0.95  // Pitch adapté au genre
         }
         
         utterance.volume = 1.0     // Volume maximum dans tous les cas
@@ -373,6 +446,16 @@ class ChessGame: ObservableObject {
     private func actuallyStartGame() {
         isGameActive = true
         targetPosition = ChessGame.generateRandomPosition()
+        
+        // Positionner les dames selon l'option choisie
+        switch selectedQueenPosition {
+        case .whiteOnBottom:
+            isWhiteQueenOnTop = false // Dame blanche en bas
+        case .blackOnBottom:
+            isWhiteQueenOnTop = true // Dame blanche en haut (donc noire en bas)
+        case .random:
+            isWhiteQueenOnTop = Bool.random() // Position aléatoire
+        }
         
         // Lire vocalement la position cible
         speakTargetPosition()
@@ -402,11 +485,31 @@ class ChessGame: ObservableObject {
             return
         }
         
+        // Utiliser la notation d'origine (sans transformation) pour la synthèse vocale
         let utterance = AVSpeechUtterance(string: targetPosition.notation)
-        utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
-        utterance.rate = 0.5
-        utterance.pitchMultiplier = useFemaleVoice ? 1.2 : 1.0
-        utterance.volume = 1.0
+        
+        // Configurer la voix avec les paramètres appropriés
+        configureVoice(utterance, isGameplay: true)
+        
+        // Double vérification: s'assurer explicitement que la voix est bien définie selon le genre
+        if useFemaleVoice && (utterance.voice == nil || utterance.voice?.gender != .female) {
+            // Si aucune voix féminine n'a été définie par configureVoice, forcer une voix française féminine
+            let frenchVoices = AVSpeechSynthesisVoice.speechVoices().filter { 
+                $0.language.starts(with: "fr") && $0.gender == .female 
+            }
+            
+            if let firstFrenchFemaleVoice = frenchVoices.first {
+                print("⚠️ Forçage d'une voix féminine: \(firstFrenchFemaleVoice.name)")
+                utterance.voice = firstFrenchFemaleVoice
+            } else {
+                // Si vraiment aucune voix féminine n'est disponible, utiliser la voix par défaut
+                print("⚠️ Aucune voix féminine française trouvée, utilisation de la voix par défaut")
+                utterance.voice = AVSpeechSynthesisVoice(language: "fr-FR")
+            }
+        }
+        
+        // Logs pour déboguer
+        print("🔊 Lecture position: \(targetPosition.notation) avec voix: \(utterance.voice?.name ?? "inconnue") (féminine: \(useFemaleVoice))")
         
         speechSynthesizer.speak(utterance)
     }
@@ -431,8 +534,24 @@ class ChessGame: ObservableObject {
     func checkAnswer(_ position: ChessPosition) {
         guard isGameActive else { return }
         
+        // Si la dame noire est en bas (plateau inversé), nous devons adapter la position cible
+        let adjustedTargetPosition: ChessPosition
+        if isWhiteQueenOnTop {
+            // Quand la dame blanche est en haut (dame noire en bas), les coordonnées sont inversées
+            // A1 devient H8, B2 devient G7, etc.
+            adjustedTargetPosition = ChessPosition(
+                file: 7 - targetPosition.file, 
+                rank: 7 - targetPosition.rank
+            )
+        } else {
+            // Configuration normale, pas d'ajustement nécessaire
+            adjustedTargetPosition = targetPosition
+        }
+        
         if selectedGameMode == .visual {
-            if position == targetPosition {
+            let correctPosition = isWhiteQueenOnTop ? adjustedTargetPosition : targetPosition
+            
+            if position == correctPosition {
                 score += 1
                 timeRemaining += 1 // Ajouter une seconde
                 message = "Correct!"
@@ -441,7 +560,15 @@ class ChessGame: ObservableObject {
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     self.message = ""
+                    
+                    // Générer une nouvelle position cible
                     self.targetPosition = ChessGame.generateRandomPosition()
+                    
+                    // En mode "Aléatoire", changer la position des dames à chaque nouvelle cible
+                    if self.selectedQueenPosition == .random {
+                        self.isWhiteQueenOnTop = Bool.random()
+                    }
+                    
                     self.speakTargetPosition()
                 }
             } else {
@@ -457,7 +584,12 @@ class ChessGame: ObservableObject {
         } else {
             // Mode coordonnées
             if let inputPosition = ChessPosition.from(notation: userInput.uppercased()) {
-                if inputPosition == targetPosition {
+                // Ajuster la position saisie si le plateau est inversé
+                let adjustedInputPosition = isWhiteQueenOnTop ? 
+                    ChessPosition(file: 7 - inputPosition.file, rank: 7 - inputPosition.rank) : 
+                    inputPosition
+                
+                if adjustedInputPosition == targetPosition {
                     score += 1
                     timeRemaining += 1 // Ajouter une seconde
                     message = "Correct!"
@@ -466,7 +598,15 @@ class ChessGame: ObservableObject {
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         self.message = ""
+                        
+                        // Générer une nouvelle position cible
                         self.targetPosition = ChessGame.generateRandomPosition()
+                        
+                        // En mode "Aléatoire", changer la position des dames à chaque nouvelle cible
+                        if self.selectedQueenPosition == .random {
+                            self.isWhiteQueenOnTop = Bool.random()
+                        }
+                        
                         self.speakTargetPosition()
                         self.userInput = "" // Réinitialiser le champ de saisie
                     }
@@ -482,5 +622,28 @@ class ChessGame: ObservableObject {
                 }
             }
         }
+    }
+    
+    // Fonction pour lister et logger toutes les voix disponibles
+    private func logAvailableVoices() {
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        print("------- VOIX DISPONIBLES -------")
+        
+        // Voix françaises
+        let frenchVoices = voices.filter { $0.language.starts(with: "fr") }
+        print("VOIX FRANÇAISES (\(frenchVoices.count)):")
+        for voice in frenchVoices {
+            print("- \(voice.name) [\(voice.identifier)], Genre: \(voice.gender == .female ? "Féminin" : (voice.gender == .male ? "Masculin" : "Non spécifié"))")
+        }
+        
+        // Autres voix
+        print("\nAUTRES VOIX (\(voices.count - frenchVoices.count)):")
+        for voice in voices where !voice.language.starts(with: "fr") {
+            if voice.language.starts(with: "en") {
+                print("- \(voice.name) [\(voice.identifier)], Langue: \(voice.language)")
+            }
+        }
+        
+        print("-------------------------------")
     }
 } 
