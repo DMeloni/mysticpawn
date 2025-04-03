@@ -8,6 +8,7 @@ enum ChessboardTheme: String, CaseIterable, Identifiable {
     case blackWhite = "Noir & Blanc"
     case tournament = "Tournament"
     case metro = "Metro"
+    case fireOfDeath = "Feu de la mort"
     
     var id: String { rawValue }
     
@@ -22,6 +23,8 @@ enum ChessboardTheme: String, CaseIterable, Identifiable {
             return "EEEED2" // Vert olive très clair
         case .metro:
             return "FFFFFF" // Blanc pur
+        case .fireOfDeath:
+            return "FFC107" // Jaune doré
         }
     }
     
@@ -36,6 +39,8 @@ enum ChessboardTheme: String, CaseIterable, Identifiable {
             return "769656" // Vert olive
         case .metro:
             return "58AC8A" // Turquoise
+        case .fireOfDeath:
+            return "FF3D00" // Rouge feu
         }
     }
     
@@ -50,6 +55,24 @@ enum ChessboardTheme: String, CaseIterable, Identifiable {
             return "4B5320" // Vert olive foncé
         case .metro:
             return "333333" // Gris foncé
+        case .fireOfDeath:
+            return "BF360C" // Bordeaux foncé
+        }
+    }
+    
+    // Couleur de surbrillance pour les cases sélectionnées
+    var highlightColor: String {
+        switch self {
+        case .classic:
+            return "E8AD30" // Orange doré qui contraste avec le beige et le marron
+        case .blackWhite:
+            return "3482F6" // Bleu clair qui contraste bien avec le noir et blanc
+        case .tournament:
+            return "D35400" // Orange qui contraste avec le vert
+        case .metro:
+            return "FF5252" // Rouge qui contraste avec le turquoise
+        case .fireOfDeath:
+            return "00FFFF" // Cyan électrique qui contraste fortement avec le rouge et le jaune
         }
     }
 }
@@ -92,6 +115,16 @@ enum QueenPosition: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+// Structure pour représenter un score enregistré
+struct SavedScore: Identifiable, Codable {
+    var id = UUID()
+    var playerName: String
+    var score: Int
+    var date: Date
+    var duration: Int // Durée de la partie en secondes
+    var gameMode: String // Mode de jeu (visuel ou coordonnées)
+}
+
 class ChessGame: ObservableObject {
     @Published var targetPosition: ChessPosition
     @Published var score: Int = 0
@@ -112,6 +145,11 @@ class ChessGame: ObservableObject {
     @Published var isInputActive: Bool = false
     @Published var isWhiteQueenOnTop: Bool = false  // Indique si la reine blanche est en haut (D8) ou en bas (D1)
     @Published var selectedQueenPosition: QueenPosition = .random // Option de position des dames
+    
+    // Propriétés pour la gestion des scores
+    @Published var highScores: [SavedScore] = []
+    @Published var playerName: String = ""
+    @Published var showNameInput: Bool = false
     
     // Notation à afficher et à prononcer en fonction de l'orientation du plateau
     var displayNotation: String {
@@ -136,6 +174,9 @@ class ChessGame: ObservableObject {
         
         // Charger les préférences utilisateur
         loadUserPreferences()
+        
+        // Charger les meilleurs scores
+        loadHighScores()
         
         // Lister toutes les voix disponibles sur l'appareil pour diagnostic
         logAvailableVoices()
@@ -527,6 +568,13 @@ class ChessGame: ObservableObject {
         // Marquer la partie comme terminée
         hasGameEnded = true
         
+        // Afficher le formulaire de saisie du nom si le score est positif
+        if score > 0 {
+            // Pré-remplir le nom avec le dernier joueur
+            playerName = getLastPlayerName()
+            showNameInput = true
+        }
+        
         // Ne pas réinitialiser le score pour permettre l'affichage du Game Over
         // Le score sera réinitialisé lors du prochain démarrage de jeu
     }
@@ -645,5 +693,74 @@ class ChessGame: ObservableObject {
         }
         
         print("-------------------------------")
+    }
+    
+    // Fonction pour sauvegarder un score
+    func saveScore() {
+        guard !playerName.isEmpty else { return }
+        
+        let newScore = SavedScore(
+            playerName: playerName,
+            score: score,
+            date: Date(),
+            duration: currentDuration,
+            gameMode: selectedGameMode.rawValue
+        )
+        
+        highScores.append(newScore)
+        
+        // Trier les scores par ordre décroissant
+        highScores.sort { $0.score > $1.score }
+        
+        // Limiter à 10 meilleurs scores par mode de jeu
+        let visualScores = highScores.filter { $0.gameMode == GameMode.visual.rawValue }
+        let coordinatesScores = highScores.filter { $0.gameMode == GameMode.coordinates.rawValue }
+        
+        if visualScores.count > 10 || coordinatesScores.count > 10 {
+            let keptVisualScores = visualScores.count > 10 ? Array(visualScores.prefix(10)) : visualScores
+            let keptCoordinatesScores = coordinatesScores.count > 10 ? Array(coordinatesScores.prefix(10)) : coordinatesScores
+            
+            highScores = keptVisualScores + keptCoordinatesScores
+        }
+        
+        // Sauvegarder les scores
+        saveHighScores()
+        
+        // Sauvegarder le nom du dernier joueur
+        UserDefaults.standard.set(playerName, forKey: "lastPlayerName")
+        
+        // Réinitialiser le nom du joueur et masquer l'input
+        playerName = ""
+        showNameInput = false
+    }
+    
+    // Charger les meilleurs scores depuis UserDefaults
+    private func loadHighScores() {
+        if let data = UserDefaults.standard.data(forKey: "highScores") {
+            do {
+                highScores = try JSONDecoder().decode([SavedScore].self, from: data)
+            } catch {
+                print("Erreur lors du chargement des scores: \(error)")
+            }
+        }
+    }
+    
+    // Sauvegarder les meilleurs scores dans UserDefaults
+    private func saveHighScores() {
+        do {
+            let data = try JSONEncoder().encode(highScores)
+            UserDefaults.standard.set(data, forKey: "highScores")
+        } catch {
+            print("Erreur lors de la sauvegarde des scores: \(error)")
+        }
+    }
+    
+    // Obtenir le nom du dernier joueur ayant enregistré un score
+    private func getLastPlayerName() -> String {
+        // Vérifier si nous avons des scores enregistrés
+        if let lastScore = UserDefaults.standard.string(forKey: "lastPlayerName") {
+            return lastScore
+        }
+        return ""
     }
 } 

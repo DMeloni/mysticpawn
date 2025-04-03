@@ -43,9 +43,6 @@ struct SettingsContent: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 30) {
-                // Section Gameplay
-                GameplaySettingsSection(game: game)
-                
                 // Section Audio
                 AudioSettingsSection(game: game)
                 
@@ -55,94 +52,6 @@ struct SettingsContent: View {
                 Spacer()
             }
         }
-    }
-}
-
-// Composant pour la section gameplay des paramètres
-struct GameplaySettingsSection: View {
-    @ObservedObject var game: ChessGame
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            // Titre de la section
-            Text("Position des dames")
-                .font(.headline)
-                .foregroundColor(AppColors.accent)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.top, 5)
-            
-            // Option pour la position des dames
-            QueenPositionSelector(game: game)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(hex: "E8DECD"))
-        )
-        .padding(.horizontal, 20)
-    }
-}
-
-// Sélecteur pour la position des dames
-struct QueenPositionSelector: View {
-    @ObservedObject var game: ChessGame
-    
-    var body: some View {
-        VStack(spacing: 15) {
-            // Options de position des dames
-            VStack(spacing: 10) {
-                ForEach(QueenPosition.allCases) { position in
-                    Button(action: {
-                        game.setQueenPosition(position)
-                    }) {
-                        HStack {
-                            if position == .whiteOnBottom {
-                                // Dame blanche en bas
-                                Image("white_queen")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 24, height: 24)
-                                Text("Dame Blanche en bas")
-                            } else if position == .blackOnBottom {
-                                // Dame noire en bas
-                                Image("black_queen")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 24, height: 24)
-                                Text("Dame Noire en bas")
-                            } else {
-                                // Mode aléatoire
-                                Image(systemName: "dice")
-                                    .font(.system(size: 20))
-                                Text("Aléatoire")
-                            }
-                            
-                            Spacer()
-                            
-                            if game.selectedQueenPosition == position {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(AppColors.woodMedium)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.white.opacity(0.7))
-                        )
-                        .foregroundColor(AppColors.accent)
-                    }
-                }
-            }
-            .padding(.horizontal, 5)
-        }
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.7))
-        )
     }
 }
 

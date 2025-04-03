@@ -77,7 +77,7 @@ struct GameView: View {
                                     // Surbrillance de la case cible
                                     let squareSize = geometry.size.width / 8
                                     Rectangle()
-                                        .fill(Color.yellow.opacity(0.3))
+                                        .fill(Color(hex: game.selectedTheme.highlightColor).opacity(0.5))
                                         .frame(width: squareSize, height: squareSize)
                                         .position(
                                             x: CGFloat(game.targetPosition.file) * squareSize + squareSize/2,
@@ -212,6 +212,7 @@ struct GameView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .shadow(radius: 2)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         .padding(.horizontal, 8)
                         .padding(.bottom, 8)
@@ -278,6 +279,7 @@ struct QuitConfirmationView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .shadow(radius: 2)
                 }
+                .buttonStyle(PlainButtonStyle())
                 
                 // Bouton Abandonner
                 Button(action: {
@@ -296,6 +298,7 @@ struct QuitConfirmationView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .shadow(radius: 2)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.top, 10)
         }

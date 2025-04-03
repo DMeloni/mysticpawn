@@ -78,15 +78,17 @@ struct HomeMenuView: View {
                         .padding(.horizontal, 30)
                         .padding(.vertical, 15)
                         .background(Color(hex: "D3A536"))
-                        .foregroundColor(AppColors.accent)
+                        .foregroundColor(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 2)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     // Bouton pour le classement
                     Button(action: {
                         withAnimation {
-                            // Action pour le classement (à implémenter)
+                            // Naviguer vers la vue des meilleurs scores
+                            currentView = .highScores
                         }
                     }) {
                         HStack {

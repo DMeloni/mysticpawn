@@ -24,6 +24,8 @@ struct ContentView: View {
                 TimerSelectionView(game: game, currentView: $currentView)
             } else if currentView == .settings {
                 SettingsView(game: game, currentView: $currentView)
+            } else if currentView == .highScores {
+                HighScoresView(game: game, currentView: $currentView)
             }
             
             // Effet visuel de brillance en cas de succès/échec
@@ -47,7 +49,6 @@ struct ContentView: View {
             
             // Overlay pour fin de partie
             if game.hasGameEnded && currentView == .game {
-                // Afficher Game Over si partie terminée (temps écoulé ou abandon)
                 GameOverView(game: game, currentView: $currentView)
             }
         }

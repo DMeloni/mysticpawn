@@ -145,4 +145,5 @@ enum AppView {
     case game
     case timerSelection
     case settings
+    case highScores
 } 

@@ -99,6 +99,14 @@ struct SquareView: View {
                           Color(hex: game.selectedTheme.darkSquareColor).opacity(0.9)) // Case noire
                     .aspectRatio(1, contentMode: .fill)
                 
+                // Surbrillance lors de la sélection
+                if isPressed {
+                    Rectangle()
+                        .fill(Color(hex: game.selectedTheme.highlightColor).opacity(0.5))
+                        .scaleEffect(0.92)
+                        .animation(.easeInOut(duration: 0.2), value: isPressed)
+                }
+                
                 // Bordure intérieure qui s'accentue lors du clic
                 Rectangle()
                     .strokeBorder(
